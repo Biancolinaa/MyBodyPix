@@ -1,0 +1,42 @@
+%%html
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.0"></script>
+<pre id="output"></pre>
+
+<script>
+    const output = document.getElementById('output');
+
+    function loadImage() {
+    const image = new Image();
+    const promise = new Promise((resolve, reject) => {
+      image.crossOrigin = '';
+      image.onload = () => {
+        resolve(image);
+      };
+    });
+
+    image.src = "https://storage.googleapis.com/tfjs-models/assets/posenet/skiing.jpg"; //da dove l'immagine?
+    return promise;
+  }
+
+  let _net = null;
+  
+  output.textContent = 'Loading...';
+  bodyPix.load()
+    .then((net) => {
+      output.textContent = 'Net loaded - loading image...';
+      _net = net;
+      return loadImage();
+    })
+    .then((image) => {
+        const input = tf.browser.fromPixels(image);
+        output.textContent = 'Image ok, estimating...';
+
+        return _net.segmentPersonParts(image, {
+            flipHorizontal: false,
+            internalResolution: 'medium',
+            segmentazionThreshold: 0.7
+        });
+    }).then((result) => {
+        output.textContent = JSON.stringify(result);
+    });

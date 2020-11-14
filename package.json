@@ -1,0 +1,22 @@
+{
+  "name": "mybodypix",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Biancolinaa/MyBodyPix.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Biancolinaa/MyBodyPix/issues"
+  },
+  "homepage": "https://github.com/Biancolinaa/MyBodyPix#readme",
+  "dependencies": {
+    "@tensorflow-models/body-pix": "^2.0.5"
+  }
+}

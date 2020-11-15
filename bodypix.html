@@ -1,12 +1,13 @@
 %%html
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.0"></script>
+<script src="https://cdn.jsdelivr.net/gh/nicolaspanel/numjs@0.15.1/dist/numjs.min.js"></script>
 <pre id="output"></pre>
 
 <script>
-    const output = document.getElementById('output');
+  const output = document.getElementById('output');
 
-    function loadImage() {
+  function loadImage() {
     const image = new Image();
     const promise = new Promise((resolve, reject) => {
       image.crossOrigin = '';
@@ -15,11 +16,27 @@
       };
     });
 
-    image.src = "https://storage.googleapis.com/tfjs-models/assets/posenet/skiing.jpg"; //da dove l'immagine?
+    image.src = "https://storage.googleapis.com/tfjs-models/assets/posenet/skiing.jpg";
     return promise;
   }
 
   let _net = null;
+  const times = [];
+  const scores = [];
+
+  async function estimate(image) {
+    const before = new Date();
+    const result = await _net.segmentPersonParts(image, {
+      flipHorizontal: false,
+      internalResolution: 'medium',
+      segmentazionThreshold: 0.7
+    });
+    return {
+      result,
+      score: result.allPoses[0].score,
+      delta: new Date() - before,
+    };
+  }
   
   output.textContent = 'Loading...';
   bodyPix.load()
@@ -28,15 +45,24 @@
       _net = net;
       return loadImage();
     })
-    .then((image) => {
+    .then(async (image) => {
         const input = tf.browser.fromPixels(image);
         output.textContent = 'Image ok, estimating...';
 
-        return _net.segmentPersonParts(image, {
-            flipHorizontal: false,
-            internalResolution: 'medium',
-            segmentazionThreshold: 0.7
-        });
-    }).then((result) => {
-        output.textContent = JSON.stringify(result);
+        const results = [];
+        for (let i = 0; i < 100; i++) {
+          const { result, delta, score } = await estimate(image);
+          results.push(result);
+          times.push(delta);
+          scores.push(score);
+        }
+
+        return results;
+    }).then((results) => {
+        // output.textContent = JSON.stringify(results);
+        // output.textContent = `${times.length} - ${JSON.stringify(times.slice(0, 10))}`;
+
+        t = nj.array(times);
+        s = nj.array(scores);
+        output.textContent = `Media: ${t.mean()} ms\nSTD: ${t.std()} ms\nScore media: ${s.mean()}`;
     });

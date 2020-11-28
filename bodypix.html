@@ -4,6 +4,8 @@
 <script src="https://cdn.jsdelivr.net/gh/nicolaspanel/numjs@0.15.1/dist/numjs.min.js"></script>
 <pre id="output"></pre>
 
+<canvas id="canvas"></canvas>
+
 <script>
   const output = document.getElementById('output');
 
@@ -39,6 +41,7 @@
   }
   
   output.textContent = 'Loading...';
+  let img = null;
   bodyPix.load()
     .then((net) => {
       output.textContent = 'Net loaded - loading image...';
@@ -46,6 +49,7 @@
       return loadImage();
     })
     .then(async (image) => {
+        img = image;
         const input = tf.browser.fromPixels(image);
         output.textContent = 'Image ok, estimating...';
 
@@ -62,7 +66,105 @@
         // output.textContent = JSON.stringify(results);
         // output.textContent = `${times.length} - ${JSON.stringify(times.slice(0, 10))}`;
 
+        // Facciamo solo il primo
+        const coloredPartImage = bodyPix.toColoredPartMask(results[0]);
+        const opacity = 0.7;
+        const flipHorizontal = false;
+        const maskBlurAmount = 0;
+        const canvas = document.getElementById('canvas');
+        bodyPix.drawMask(canvas, img, coloredPartImage, opacity, maskBlurAmount, flipHorizontal);
+
+
         t = nj.array(times);
         s = nj.array(scores);
         output.textContent = `Media: ${t.mean()} ms\nSTD: ${t.std()} ms\nScore media: ${s.mean()}`;
     });
+
+
+//MULTI POSE
+
+%%html
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.0"></script>
+<script src="https://cdn.jsdelivr.net/gh/nicolaspanel/numjs@0.15.1/dist/numjs.min.js"></script>
+<pre id="output"></pre>
+
+<canvas id="canvas"></canvas>
+
+<script>
+  const output = document.getElementById('output');
+
+  function loadImage() {
+    const image = new Image();
+    const promise = new Promise((resolve, reject) => {
+      image.crossOrigin = '';
+      image.onload = () => {
+        resolve(image);
+      };
+    });
+
+    image.src = "https://storage.googleapis.com/tfjs-models/assets/posenet/multi_skiing.jpg";
+    return promise;
+  }
+
+  let _net = null;
+  const times = [];
+  const scores = [];
+  const persone = [];
+
+  async function estimate(image) {
+    const before = new Date();
+    const result = await _net.segmentMultiPersonParts(image, {
+      flipHorizontal: false,
+      internalResolution: 'medium',
+      segmentationThreshold: 0.7,
+      maxDetections: 10,
+      scoreThreshold: 0.2,
+      nmsRadius: 20,
+      minKeypointScore: 0.3,
+      refineSteps: 10
+    });
+    return {
+      result,
+      score: nj.array(result.map((r) => r.pose.score)).mean(),
+      numPersone: result.length,
+      delta: new Date() - before,
+    };
+  }
+  
+  output.textContent = 'Loading...';
+  let img = null;
+  let result = null;
+  bodyPix.load()
+    .then((net) => {
+      output.textContent = 'Net loaded - loading image...';
+      _net = net;
+      return loadImage();
+    })
+    .then(async (image) => {
+        img = image;
+        const input = tf.browser.fromPixels(image);
+        output.textContent = 'Image ok, estimating...';
+
+        for (let i = 0; i < 1; i++) {
+          const { result: r, score, delta, numPersone } = await estimate(image);
+          result = r;
+          times.push(delta);
+          scores.push(score);
+          persone.push(numPersone);
+        }
+    }).then(() => {
+        const coloredPartImage = bodyPix.toColoredPartMask(result);
+        const opacity = 0.7;
+        const flipHorizontal = false;
+        const maskBlurAmount = 0;
+        const canvas = document.getElementById('canvas');
+        bodyPix.drawMask(canvas, img, coloredPartImage, opacity, maskBlurAmount, flipHorizontal);
+
+        t = nj.array(times);
+        p = nj.array(persone);
+        s = nj.array(scores);
+        output.textContent = `Media: ${t.mean()} ms\nSTD: ${t.std()} ms\nNumero persone: ${p.mean()}\nScore: ${s.mean()}`;
+    }).catch((error) => {
+      output.textContent = error.message
+    })
